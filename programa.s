@@ -38,13 +38,14 @@
         .ascii "Posicion %d : %d\n"
         msg_posicion_len = . - msg_posicion   
 */
-//.include "bubbleSort.s"
+
 //.include "selectionSort.s"
 
 .text
 .global _start
 
 .include "itoa.s"
+.include "bubbleSort.s"
 
 _start:
     adr x1, msg_arreglo_desordenado  //cargamos la direccion del  mensaje en x1
@@ -56,6 +57,28 @@ _start:
     adr x1, msg_delimitador // cargamos la direccion del mensaje delimitador en x1
     mov x2, msg_delimitador_len // tamaño del mensaje delimitador en x2
     bl print
+
+    // x21 ya lleva la direccion del arreglo
+    adr x21, arreglo
+    adr x19, tamanio
+    ldr w19, [x19] // cargamos de nuevo w19 ya que en imprimir_arreglo se hizo 0 
+    bl bubbleStart
+    // agregamos salto de linea para imprimir el arreglo ordenado
+    adr x1, msg_newline
+    mov x2, msg_newline_len
+    bl print
+
+    //imprimir arreglo ordenado
+    adr x1, msg_arreglo_ordenado  //cargamos la direccion del  mensaje en x1
+    mov x2, msg_arreglo_ordenado_len // cargamos el tamaño del mensaje en x2
+    bl print // llamamos a la etiqueta print
+
+    bl imprimir_arreglo
+
+    adr x1, msg_delimitador // cargamos la direccion del mensaje delimitador en x1
+    mov x2, msg_delimitador_len // tamaño del mensaje delimitador en x2
+    bl print
+    
     b exit
 
 imprimir_arreglo:
@@ -76,6 +99,8 @@ loop_arreglo:
     adr x0, buffer_linea        // Destino en buffer
     adr x1, msg_pos_prefix      // Origen del texto
     mov x2, msg_pos_prefix_len  // Longitud (9 bytes)
+    // copiar texto recibe x1 (origen) y x2(tamaño) 
+    // copiar texto retorna en x0 lo copiado
     bl copiar_texto             // x0 queda al final de lo copiado
 
     //convertir indice x22 a ascii y agregarlo al buffer_linea
@@ -132,6 +157,9 @@ print:
     ret //regresamos a donde fue llamada   
 
 copiar_texto:
+    // x1 = direccion origen de donde copia el texto
+    // x0 = direccion destino donde se copiara el texto
+    // x2 = tamaño del origen
     cbz x2, fin_copiar  // verificar si x2 es cero y ya se copio toda la cadena en x0
 loop_copiar:
     ldrb w3, [x1], #1   // Lee 1 byte de x1 e incrementa x1
