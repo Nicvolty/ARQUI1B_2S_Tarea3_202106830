@@ -16,14 +16,28 @@
     tamanio:
         .word 10 //establecemos el tamaño
 
-    buffer_salida:
-        .quad 0, 10  // buffer para almacenar el numero a imprimir y el un salto de linea   
+    msg_pos_prefix:
+        .ascii "Posicion "
+        msg_pos_prefix_len = . - msg_pos_prefix
 
-.section .rodata    
+    msg_pos_separador:
+        .ascii " : "
+        msg_pos_separador_len = . - msg_pos_separador
+
+    msg_newline:
+        .ascii "\n"
+        msg_newline_len = . - msg_newline
+
+    .align 3
+    // Buffer para construir la linea completa posicion 1 : 500\n
+    buffer_linea:
+        .space 64          
+
+/*.section .rodata    
     msg_posicion: // declaracion del mensaje para ir mostrando la posicion del elemento
         .ascii "Posicion %d : %d\n"
         msg_posicion_len = . - msg_posicion   
-
+*/
 //.include "bubbleSort.s"
 //.include "selectionSort.s"
 
@@ -51,22 +65,56 @@ imprimir_arreglo:
     adr x19, tamanio
     ldr w19, [x19] // tamaño del arreglo guardado en w19 o x19
     mov x20, #0 // desplazador para ir iterando entre cada numero del arreglo
+    mov x22, #0 // indice de la posicion para el mensaje posicion n : numero \n
     adr x21, arreglo   //cargar direccion de arreglo en x21
 
 loop_arreglo:
     //logica del loop
     cbz w19, fin_loop  //verificar si ya se recorrio todo el arreglo
-    ldr x0, [x21,x20]          // cargar el valor a imprimir desplazandonos por el arreglo los bytes que lleve x20
-    adr x1, buffer_salida //cargar direccion de buffer_salida
-    add x1, x1, #8 // desplazamos 8 bytes justo en el final de buffer_salida
-    // saltamos al logaritmo para hacer un integer a ascii
-    bl itoa   
-    // x1 y x2 ya traen lo que necesita print
-    add x2, x2, #1 // Ajustamos x2 para incluir el '\n' en la impresión
+
+    // copiar "Posicion " en buffer_linea
+    adr x0, buffer_linea        // Destino en buffer
+    adr x1, msg_pos_prefix      // Origen del texto
+    mov x2, msg_pos_prefix_len  // Longitud (9 bytes)
+    bl copiar_texto             // x0 queda al final de lo copiado
+
+    //convertir indice x22 a ascii y agregarlo al buffer_linea
+    mov x23, x0                 // Guardamos la posición inicial donde estamos
+    add x1, x0, #8              
+    mov x0, x22                 // Número a convertir = índice actual
+    bl itoa                     // Retorna x1 = inicio del índice en ASCII, x2 = largo
+
+    // Copiamos los dígitos del índice al destino final de la línea
+    mov x0, x23
+    bl copiar_texto             // Copia el índice convertido
+
+    // copiar separador ":" en buffer_linea
+    adr x1, msg_pos_separador
+    mov x2, msg_pos_separador_len
+    bl copiar_texto
+
+    // Convertir y copiar el numero del arreglo
+    mov x23, x0                 // Guardar posición actual
+    add x1, x0, #16             // Dar 16 bytes a itoa para escribir hacia atrás
+    ldr x0, [x21, x20]          // Cargar el número real del arreglo 
+    bl itoa                     // x1 = inicio del número, x2 = largo dígitos
+
+    mov x0, x23                 // Restaurar posición de destino
+    bl copiar_texto             // Copiar los dígitos del número
+
+    // Copiar el SALTO DE LÍNEA "\n" 
+    adr x1, msg_newline
+    mov x2, msg_newline_len
+    bl copiar_texto
+    
+    // IMPRIMIR LA LÍNEA COMPLETA CON PRINT
+    adr x1, buffer_linea        // Inicio de la cadena armada
+    sub x2, x0, x1              // Largo total = Puntero final (x0) - Puntero inicial (x1)
     bl print
 
-    add x20, x20, #8 //sumamos 8 que son los bytes que nos desplazamos entre cada elemento del arreglo
-    sub w19, w19, #1 //restamos uno al tamaño para saber cuando llegamos a 0 y ya se itero todos los elementos
+    add x20, x20, #8            //sumamos 8 que son los bytes que nos desplazamos entre cada elemento del arreglo
+    add x22, x22, #1            // Siguiente posición (0 -> 1 -> 2...)
+    sub w19, w19, #1            //restamos uno al tamaño para saber cuando llegamos a 0 y ya se itero todos los elementos
     b loop_arreglo
 
 fin_loop:
@@ -82,6 +130,16 @@ print:
     mov x8, #64 //syscall de escritura 
     svc 0 //ejecutamos la syscall
     ret //regresamos a donde fue llamada   
+
+copiar_texto:
+    cbz x2, fin_copiar  // verificar si x2 es cero y ya se copio toda la cadena en x0
+loop_copiar:
+    ldrb w3, [x1], #1   // Lee 1 byte de x1 e incrementa x1
+    strb w3, [x0], #1   // Escribe 1 byte en x0 e incrementa x0
+    subs x2, x2, #1
+    b.ne loop_copiar
+fin_copiar:
+    ret
 
 exit:
     //terminar ejecucion
